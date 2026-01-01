@@ -1,0 +1,5 @@
+{
+  "name": "Trello-Lite Task Manager",
+  "description": "A high-performance Kanban-style task management application built with React, Supabase, and Tailwind CSS. Features real-time synchronization, drag-and-drop task organization, and a responsive Trello-inspired interface.",
+  "requestFramePermissions": []
+}
