@@ -16,9 +16,6 @@ const ListColumn: React.FC<ListColumnProps> = ({ list, index }) => {
   const { state, dispatch } = useKanban();
   const [isEditingMetadata, setIsEditingMetadata] = useState(false);
   const [editTitle, setEditTitle] = useState(list.title);
-  const [editDesc, setEditDesc] = useState(list.description || '');
-  const [isAddingTask, setIsAddingTask] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -30,25 +27,29 @@ const ListColumn: React.FC<ListColumnProps> = ({ list, index }) => {
     })
     .sort((a, b) => a.position - b.position);
 
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
+  const handleOpenNewNoteModal = async () => {
     try {
       const position = state.tasks.filter(t => t.list_id === list.id).length;
-      await db.createTask(list.id, newTaskTitle.trim(), '', position);
-      setNewTaskTitle('');
-      setIsAddingTask(false);
+      // Create a skeleton note in DB so we can open it in the editor
+      const newTask = await db.createTask(list.id, 'New Note', '', position);
+      dispatch({ type: 'ADD_TASK', payload: newTask });
+      // Trigger the global editor
+      dispatch({ type: 'SET_EDITING_TASK', payload: newTask });
     } catch (error: any) {
-      alert(`Error: ${error.message}`);
+      console.error('Error initiating note:', error);
+      alert(`Error: ${error.message || 'Check your database connection/schema'}`);
     }
   };
 
   const handleUpdateMetadata = async () => {
+    if (!editTitle.trim()) {
+      setEditTitle(list.title);
+      setIsEditingMetadata(false);
+      return;
+    }
     try {
-      await db.updateList(list.id, { 
-        title: editTitle.trim(), 
-        description: editDesc.trim() 
-      });
+      const updated = await db.updateList(list.id, { title: editTitle.trim() });
+      dispatch({ type: 'UPDATE_LIST', payload: updated });
       setIsEditingMetadata(false);
     } catch (error: any) {
       alert(`Update failed: ${error.message}`);
@@ -76,97 +77,79 @@ const ListColumn: React.FC<ListColumnProps> = ({ list, index }) => {
             ref={provided.innerRef} 
             className={`w-[280px] shrink-0 flex flex-col max-h-full transition-all duration-300 ${isDeleting ? 'opacity-0 scale-95' : ''}`}
           >
-            <div className="flex flex-col max-h-full glass rounded-2xl overflow-hidden group relative border-white/[0.03] shadow-lg">
+            <div className="flex flex-col max-h-full glass rounded-[2rem] overflow-hidden group relative transition-all duration-500">
               {/* Column Header */}
               <div 
                 {...provided.dragHandleProps} 
-                className={`p-4 flex flex-col gap-1.5 bg-white/[0.01] border-b border-white/[0.03] ${isEditingMetadata ? 'ring-1 ring-inset ring-indigo-500/30' : ''}`}
+                className="px-6 py-5 flex items-center justify-between border-b border-white/[0.03]"
               >
-                {isEditingMetadata ? (
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-3 overflow-hidden flex-1">
+                  {isEditingMetadata ? (
                     <input 
                       autoFocus 
-                      className="bg-slate-950/50 border border-white/10 rounded-lg px-2 py-1 text-[11px] font-bold text-white outline-none w-full" 
+                      className="bg-transparent text-[11px] font-black text-white outline-none w-full uppercase tracking-widest italic" 
                       value={editTitle} 
-                      onChange={(e) => setEditTitle(e.target.value)} 
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onBlur={handleUpdateMetadata}
+                      onKeyDown={(e) => e.key === 'Enter' && handleUpdateMetadata()}
                     />
-                    <div className="flex gap-2">
-                      <button onClick={handleUpdateMetadata} className="flex-1 bg-white text-slate-950 text-[9px] py-1 rounded-md font-bold uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Save</button>
-                      <button onClick={() => setIsEditingMetadata(false)} className="px-2 text-slate-500 text-[9px] font-bold uppercase hover:text-white">Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
+                  ) : (
                     <div className="flex items-center gap-2 overflow-hidden">
                       <h2 
                         onClick={() => setIsEditingMetadata(true)} 
-                        className="text-[10px] font-black text-slate-300 uppercase tracking-widest truncate cursor-pointer hover:text-white"
+                        className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] truncate cursor-pointer hover:text-white transition-colors"
                       >
                         {list.title}
                       </h2>
-                      <span className="shrink-0 text-[10px] font-bold text-slate-600 bg-white/5 px-1.5 rounded-md">
+                      <span className="text-[9px] font-bold text-slate-800">
                         {filteredTasks.length}
                       </span>
                     </div>
-                    <button 
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteModal(true); }} 
-                      className="text-slate-700 hover:text-rose-500 p-0.5 opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <button 
+                    onClick={handleOpenNewNoteModal} 
+                    className="p-1.5 text-slate-500 hover:text-indigo-400 transition-all hover:scale-110"
+                    title="Add Note"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3.5}><path d="M12 4v16m8-8H4" /></svg>
+                  </button>
+                  <button 
+                    onClick={() => setShowDeleteModal(true)} 
+                    className="p-1.5 text-slate-800 hover:text-rose-500 transition-all"
+                    title="Delete Stack"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3.5}><path d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
               </div>
 
-              {/* Tasks Area - Reduced Padding */}
+              {/* Notes Stream Area */}
               <Droppable droppableId={list.id} type="task">
                 {(provided, snapshot) => (
                   <div 
                     {...provided.droppableProps} 
                     ref={provided.innerRef} 
-                    className={`flex-1 p-3 min-h-[50px] overflow-y-auto space-y-3 custom-scrollbar transition-all ${
-                      snapshot.isDraggingOver ? 'bg-indigo-500/[0.03]' : ''
+                    className={`flex-1 overflow-y-auto custom-scrollbar transition-all ${
+                      snapshot.isDraggingOver ? 'bg-white/[0.01]' : ''
                     }`}
                   >
                     {filteredTasks.map((task, idx) => (
                       <TaskCard key={task.id} task={task} index={idx} />
                     ))}
                     {provided.placeholder}
-                    {filteredTasks.length === 0 && !isAddingTask && (
-                      <div className="py-6 flex flex-col items-center justify-center opacity-10">
-                        <span className="text-[8px] font-black uppercase tracking-widest">Idle</span>
+                    
+                    {filteredTasks.length === 0 && (
+                      <div className="py-20 flex flex-col items-center justify-center opacity-[0.03] select-none pointer-events-none px-6 text-center">
+                         <svg className="w-8 h-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        <span className="text-[9px] font-black uppercase tracking-[0.4em]">Empty Stack</span>
                       </div>
                     )}
                   </div>
                 )}
               </Droppable>
-
-              {/* Footer */}
-              <div className="p-3 bg-white/[0.01] border-t border-white/[0.02]">
-                {isAddingTask ? (
-                  <form onSubmit={handleAddTask} className="space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
-                    <input 
-                      autoFocus 
-                      placeholder="Title..." 
-                      className="w-full p-2 text-[11px] bg-slate-950/60 border border-white/5 text-white rounded-lg focus:ring-1 focus:ring-indigo-600 outline-none font-medium" 
-                      value={newTaskTitle} 
-                      onChange={(e) => setNewTaskTitle(e.target.value)} 
-                    />
-                    <div className="flex gap-1.5">
-                      <button type="submit" className="flex-1 bg-white text-slate-950 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Create</button>
-                      <button type="button" onClick={() => setIsAddingTask(false)} className="px-2 text-slate-500 hover:text-white text-[9px] font-bold uppercase transition-colors">Exit</button>
-                    </div>
-                  </form>
-                ) : (
-                  <button 
-                    onClick={() => setIsAddingTask(true)} 
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-all text-[9px] font-black text-slate-600 uppercase tracking-widest hover:text-slate-400"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M12 4v16m8-8H4" /></svg>
-                    New Card
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         )}
@@ -174,9 +157,9 @@ const ListColumn: React.FC<ListColumnProps> = ({ list, index }) => {
 
       <ConfirmModal
         isOpen={showDeleteModal}
-        title="Purge Column"
-        message="Delete column and its records?"
-        confirmLabel="Purge"
+        title="Delete Stack"
+        message="This will remove this entire collection of notes permanently."
+        confirmLabel="Confirm Delete"
         onConfirm={confirmDeleteList}
         onCancel={() => setShowDeleteModal(false)}
       />

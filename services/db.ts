@@ -3,14 +3,22 @@ import { supabase } from '../supabaseClient';
 import { Board, List, Task } from '../types';
 
 export const db = {
-  // Boards
+  // Boards - Public Fetching
   async fetchBoards() {
-    const { data, error } = await supabase.from('boards').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('boards')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
     if (error) throw error;
     return data as Board[];
   },
   async createBoard(title: string) {
-    const { data, error } = await supabase.from('boards').insert([{ title }]).select().single();
+    const { data, error } = await supabase
+      .from('boards')
+      .insert([{ title }]) 
+      .select()
+      .single();
     if (error) throw error;
     return data as Board;
   },
@@ -63,15 +71,14 @@ export const db = {
     return data as Task[];
   },
   async createTask(listId: string, title: string, description: string, position: number) {
+    // CRITICAL: We only insert fields guaranteed to exist in the user's basic schema
     const { data, error } = await supabase.from('tasks').insert([{ 
       list_id: listId, 
       title, 
       description, 
-      position,
-      priority: 'low',
-      labels: [],
-      subtasks: []
+      position
     }]).select().single();
+    
     if (error) throw error;
     return data as Task;
   },

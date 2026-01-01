@@ -45,6 +45,7 @@ export type KanbanState = {
   filterPriority: TaskPriority | 'all';
   selectedTaskIds: string[];
   isSelectionMode: boolean;
+  editingTask: Task | null;
 };
 
 export type KanbanAction =
@@ -66,4 +67,5 @@ export type KanbanAction =
   | { type: 'SET_FILTER_PRIORITY'; payload: TaskPriority | 'all' }
   | { type: 'TOGGLE_TASK_SELECTION'; payload: string }
   | { type: 'SET_SELECTION_MODE'; payload: boolean }
-  | { type: 'CLEAR_SELECTION' };
+  | { type: 'CLEAR_SELECTION' }
+  | { type: 'SET_EDITING_TASK'; payload: Task | null };

@@ -12,6 +12,7 @@ const initialState: KanbanState = {
   filterPriority: 'all',
   selectedTaskIds: [],
   isSelectionMode: false,
+  editingTask: null,
 };
 
 const kanbanReducer = (state: KanbanState, action: KanbanAction): KanbanState => {
@@ -58,15 +59,18 @@ const kanbanReducer = (state: KanbanState, action: KanbanAction): KanbanState =>
     case 'ADD_TASK':
       return { ...state, tasks: [...state.tasks, action.payload].sort((a, b) => a.position - b.position) };
     case 'UPDATE_TASK':
+      const updatedTasks = state.tasks.map((t) => (t.id === action.payload.id ? action.payload : t)).sort((a, b) => a.position - b.position);
       return {
         ...state,
-        tasks: state.tasks.map((t) => (t.id === action.payload.id ? action.payload : t)).sort((a, b) => a.position - b.position)
+        tasks: updatedTasks,
+        editingTask: state.editingTask?.id === action.payload.id ? action.payload : state.editingTask
       };
     case 'DELETE_TASK':
       return { 
         ...state, 
         tasks: state.tasks.filter((t) => t.id !== action.payload),
-        selectedTaskIds: state.selectedTaskIds.filter(id => id !== action.payload)
+        selectedTaskIds: state.selectedTaskIds.filter(id => id !== action.payload),
+        editingTask: state.editingTask?.id === action.payload ? null : state.editingTask
       };
     case 'SET_SEARCH_QUERY':
       return { ...state, searchQuery: action.payload };
@@ -84,6 +88,8 @@ const kanbanReducer = (state: KanbanState, action: KanbanAction): KanbanState =>
       };
     case 'CLEAR_SELECTION':
       return { ...state, selectedTaskIds: [] };
+    case 'SET_EDITING_TASK':
+      return { ...state, editingTask: action.payload };
     default:
       return state;
   }
